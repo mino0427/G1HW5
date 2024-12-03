@@ -1,7 +1,8 @@
 import socket
 import threading
 from queue import Queue
-from datetime import datetime  # 현재 시간 출력을 위해 추가
+from datetime import datetime
+import time
 
 def send_messages(group, nicknames, send_queue):
     print('Send Thread Started')
@@ -41,6 +42,14 @@ def send_messages(group, nicknames, send_queue):
                             pass
                 else:
                     sender_conn.send(f"User '{target_nickname}' not found.".encode())
+            elif isinstance(message, tuple) and message[0] == "SCHEDULED":  # 예약 메시지 처리
+                _, sender_nickname, scheduled_message = message
+                current_time = datetime.now().strftime("%H:%M")
+                for conn in group:
+                    try:
+                        conn.send(f'[{current_time}] [Scheduled by {sender_nickname}] {scheduled_message}'.encode())
+                    except:
+                        pass
             elif isinstance(message, tuple) and message[0] == "WHISPER":  # 귓속말 처리
                 sender_conn, target_nickname, whisper_message = message[1:]
                 sender_nickname = nicknames.get(sender_conn, "Unknown")
@@ -70,7 +79,23 @@ def send_messages(group, nicknames, send_queue):
         except Exception as e:
             print(f"Error in send_messages: {e}")
 
-def receive_messages(conn, client_id, nicknames, send_queue, group):
+def handle_scheduled_messages(schedule_queue, send_queue, nicknames):
+    """예약 메시지를 처리하는 스레드"""
+    while True:
+        try:
+            now = datetime.now().strftime("%H:%M")
+            scheduled_tasks = list(schedule_queue.queue)
+            for task in scheduled_tasks:
+                if task[0] == now:
+                    _, sender_conn, message = task
+                    sender_nickname = nicknames.get(sender_conn, "Unknown")
+                    send_queue.put(("SCHEDULED", sender_nickname, message))
+                    schedule_queue.get()  # 작업 제거
+            time.sleep(30)  # 30초마다 예약 확인
+        except Exception as e:
+            print(f"Error in handle_scheduled_messages: {e}")
+
+def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_queue):
     print(f'Receive Thread {client_id} Started')
     try:
         while True:
@@ -95,9 +120,15 @@ def receive_messages(conn, client_id, nicknames, send_queue, group):
         while True:
             try:
                 data = conn.recv(1024).decode()
-                if data.startswith("/whisper"):  # 귓속말 명령 처리
-                    _, target_nickname, whisper_message = data.split(maxsplit=2)
-                    send_queue.put(("WHISPER", conn, target_nickname, whisper_message))
+                if data.startswith("/schedule"):  # 예약 메시지 명령 처리
+                    try:
+                        _, scheduled_time, scheduled_message = data.split(maxsplit=2)
+                        # 시간 형식 검증
+                        datetime.strptime(scheduled_time, "%H:%M")
+                        schedule_queue.put((scheduled_time, conn, scheduled_message))
+                        conn.send(f"Message scheduled for {scheduled_time}".encode())
+                    except ValueError:
+                        conn.send("Invalid time format. Use HH:MM.".encode())
                 elif data == "/user":  # 사용자 목록 조회 명령
                     user_list = ', '.join(nicknames.values())
                     conn.send(f'Users in chat: {user_list}'.encode())
@@ -140,10 +171,13 @@ def receive_messages(conn, client_id, nicknames, send_queue, group):
                     other_conn.send(f'User "{left_nickname}" has left the chat.'.encode())
                 except:
                     pass
+        else:
+            print(f"Connection {conn} was already removed.")
         conn.close()
 
 if __name__ == '__main__':
     send_queue = Queue()
+    schedule_queue = Queue()  # 예약 메시지 큐
     HOST = ''
     PORT = 9000
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -153,6 +187,9 @@ if __name__ == '__main__':
     client_id = 0
     group = []
     nicknames = {}  # 닉네임을 저장할 딕셔너리
+
+    # 예약 메시지 처리 스레드 시작
+    threading.Thread(target=handle_scheduled_messages, args=(schedule_queue, send_queue, nicknames), daemon=True).start()
 
     while True:
         try:
@@ -167,6 +204,6 @@ if __name__ == '__main__':
             else:
                 threading.Thread(target=send_messages, args=(group, nicknames, send_queue,)).start()
 
-            threading.Thread(target=receive_messages, args=(conn, client_id, nicknames, send_queue, group)).start()
+            threading.Thread(target=receive_messages, args=(conn, client_id, nicknames, send_queue, group, schedule_queue)).start()
         except Exception as e:
             print(f"Server error: {e}")
