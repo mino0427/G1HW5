@@ -5,25 +5,24 @@ from datetime import datetime
 import time
 
 # 로그 파일 설정
-log_file_path = "server.txt"
-log_lock = threading.Lock()
+# log_file_path = f"server.txt"
+# log_file = open(log_file_path, 'w', encoding='utf-8')  # UTF-8 인코딩으로 로그 파일 생성
+# log_file.write(f"[로그 시작] Server.txt\n")  # 로그 시작 메시지 기록
 
-def log_message(message):
-    """로그 메시지를 파일과 콘솔에 출력"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    formatted_message = f"[{timestamp}] {message}\n"
-    print(formatted_message.strip())  # 콘솔 출력
-    with log_lock:
-        with open(log_file_path, 'a', encoding='utf-8') as log_file:
-            log_file.write(formatted_message)  # 파일 기록
+# def log_message(message):
+#     """로그 메시지를 파일과 콘솔에 출력"""
+#     timestamp = datetime.now().strftime("%H:%M")
+#     formatted_message = f"[{timestamp}] {message}\n"
+#     print(formatted_message.strip())  # 콘솔 출력
+#     log_file.write(formatted_message)  # 파일 기록
 
 def send_messages(group, nicknames, send_queue):
-    log_message('Send Thread Started')
+    print('Send Thread Started')
     while True:
         try:
             message = send_queue.get()
             if isinstance(message, str) and message == 'Group Changed':
-                log_message('Group Changed')
+                print('Group Changed')
                 continue
             if isinstance(message, tuple) and message[0] == "KICK":  # 강퇴 처리
                 sender_conn, target_nickname = message[1], message[2]
@@ -47,7 +46,8 @@ def send_messages(group, nicknames, send_queue):
                         group.remove(target_conn)
                     if target_conn in nicknames:  # nicknames에 존재하는지 확인
                         del nicknames[target_conn]
-                    log_message(f"{target_nickname} has been kicked.")
+                    print(f"{target_nickname} has been kicked.")
+                    # log_file.write(f"{target_nickname} has been kicked.\n")
                     for other_conn in group:
                         try:
                             other_conn.send(f"{target_nickname} has been kicked from the chat.".encode())
@@ -58,7 +58,6 @@ def send_messages(group, nicknames, send_queue):
             elif isinstance(message, tuple) and message[0] == "SCHEDULED":  # 예약 메시지 처리
                 _, sender_nickname, scheduled_message = message
                 current_time = datetime.now().strftime("%H:%M")
-                log_message(f"[Scheduled by {sender_nickname}] {scheduled_message}")
                 for conn in group:
                     try:
                         conn.send(f'[{current_time}] [Scheduled by {sender_nickname}] {scheduled_message}'.encode())
@@ -77,7 +76,7 @@ def send_messages(group, nicknames, send_queue):
                         current_time = datetime.now().strftime("%H:%M")
                         target_conn.send(f'[{current_time}] [Whisper from {sender_nickname}] {whisper_message}'.encode())
                         sender_conn.send(f'[{current_time}] [Whisper to {target_nickname}] {whisper_message}'.encode())
-                        log_message(f"[Whisper] {sender_nickname} -> {target_nickname}: {whisper_message}")
+                        # log_file.write(f"[{current_time}] [Whisper] {sender_nickname} -> {target_nickname}: {whisper_message}\n")
                     except:
                         sender_conn.send("Failed to send whisper.".encode())
                 else:
@@ -85,15 +84,15 @@ def send_messages(group, nicknames, send_queue):
             else:
                 sender_nickname = nicknames.get(message[1], "Unknown")
                 current_time = datetime.now().strftime("%H:%M")  # 현재 시간 가져오기
-                log_message(f"{sender_nickname} >> {message[0]}")
                 for conn in group:
                     if conn != message[1]:
                         try:
                             conn.send(f'[{current_time}] {sender_nickname} >> {message[0]}'.encode())
+                            # log_file.write(f"[{current_time}] {sender_nickname} >> {message[0]}\n")
                         except:
                             pass
         except Exception as e:
-            log_message(f"Error in send_messages: {e}")
+            print(f"Error in send_messages: {e}")
 
 def handle_scheduled_messages(schedule_queue, send_queue, nicknames):
     """예약 메시지를 처리하는 스레드"""
@@ -109,10 +108,10 @@ def handle_scheduled_messages(schedule_queue, send_queue, nicknames):
                     schedule_queue.get()  # 작업 제거
             time.sleep(30)  # 30초마다 예약 확인
         except Exception as e:
-            log_message(f"Error in handle_scheduled_messages: {e}")
+            print(f"Error in handle_scheduled_messages: {e}")
 
 def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_queue):
-    log_message(f'Receive Thread {client_id} Started')
+    print(f'Receive Thread {client_id} Started')
     try:
         while True:
             nickname = conn.recv(1024).decode()  # 클라이언트로부터 닉네임 수신
@@ -122,7 +121,8 @@ def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_que
                 nicknames[conn] = nickname  # 닉네임 저장
                 break
 
-        log_message(f'Client {client_id} joined as "{nickname}"')
+        print(f'Client {client_id} joined as "{nickname}"')
+        # log_file.write(f'Client {client_id} joined as "{nickname}"')
         conn.send(f'Welcome {nickname}! You can start chatting.'.encode())
 
         # 새로운 클라이언트 접속 알림
@@ -143,7 +143,7 @@ def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_que
                         datetime.strptime(scheduled_time, "%H:%M")
                         schedule_queue.put((scheduled_time, conn, scheduled_message))
                         conn.send(f"Message scheduled for {scheduled_time}".encode())
-                        log_message(f'{nickname} scheduled a message at {scheduled_time}: {scheduled_message}')
+
                     except ValueError:
                         conn.send("Invalid time format. Use HH:MM.".encode())
                 elif data == "/user":  # 사용자 목록 조회 명령
@@ -157,7 +157,8 @@ def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_que
                         old_nickname = nicknames[conn]
                         nicknames[conn] = new_nickname
                         conn.send(f'Nickname successfully changed to "{new_nickname}".'.encode())
-                        log_message(f'User "{old_nickname}" changed their nickname to "{new_nickname}".')
+                        print(f'User "{old_nickname}" changed their nickname to "{new_nickname}".')
+                        # log_file.write(f'User "{old_nickname}" changed their nickname to "{new_nickname}".')
                         # 변경 사실을 다른 사용자들에게 알림
                         for other_conn in group:
                             if other_conn != conn:
@@ -168,18 +169,17 @@ def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_que
                 elif client_id == 1 and data.startswith("/kick"):  # 클라이언트 1만 강퇴 가능
                     _, target_nickname = data.split(maxsplit=1)
                     send_queue.put(("KICK", conn, target_nickname))
-                    log_message(f'{nickname} requested to kick {target_nickname}')
                 else:
                     send_queue.put([data, conn])
             except (ConnectionAbortedError, ConnectionResetError):
                 break
     except (ConnectionAbortedError, ConnectionResetError) as e:
-        log_message(f"Connection error for client {client_id}: {e}")
-    finally:
+        print(f"Connection error for client {client_id}: {e}")
         # 연결 종료 처리
         if conn in nicknames:  # nicknames에 존재하는지 확인
             left_nickname = nicknames[conn]
-            log_message(f'{left_nickname} disconnected.')
+            print(f'{left_nickname} disconnected.')
+            # log_file.write(f'{left_nickname} disconnected.')
             if conn in group:  # group에 존재하는지 확인
                 group.remove(conn)
             del nicknames[conn]  # 안전하게 삭제
@@ -190,7 +190,8 @@ def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_que
                 except:
                     pass
         else:
-            log_message(f"Connection {conn} was already removed.")
+            print(f"Connection {conn} was already removed.")
+            # log_file.write(f"Connection {conn} was already removed.")
         conn.close()
 
 if __name__ == '__main__':
@@ -214,7 +215,8 @@ if __name__ == '__main__':
             client_id += 1
             conn, addr = server_sock.accept()
             group.append(conn)
-            log_message(f'Connected {addr}')
+            print(f'Connected {addr}')
+            # log_file.write(f'Connected {addr}')
 
             if client_id > 1:
                 send_queue.put('Group Changed')
@@ -224,4 +226,4 @@ if __name__ == '__main__':
 
             threading.Thread(target=receive_messages, args=(conn, client_id, nicknames, send_queue, group, schedule_queue)).start()
         except Exception as e:
-            log_message(f"Server error: {e}")
+            print(f"Server error: {e}")
