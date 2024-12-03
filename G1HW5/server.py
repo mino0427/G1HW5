@@ -10,7 +10,7 @@ log_lock = threading.Lock()
 
 def log_message(message):
     """로그 메시지를 파일과 콘솔에 출력"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     formatted_message = f"[{timestamp}] {message}\n"
     print(formatted_message.strip())  # 콘솔 출력
     with log_lock:
@@ -107,7 +107,7 @@ def handle_scheduled_messages(schedule_queue, send_queue, nicknames):
                     sender_nickname = nicknames.get(sender_conn, "Unknown")
                     send_queue.put(("SCHEDULED", sender_nickname, message))
                     schedule_queue.get()  # 작업 제거
-            time.sleep(30)  # 30초마다 예약 확인
+            time.sleep(10)  # 10초마다 예약 확인
         except Exception as e:
             log_message(f"Error in handle_scheduled_messages: {e}")
 
@@ -196,7 +196,7 @@ def receive_messages(conn, client_id, nicknames, send_queue, group, schedule_que
 if __name__ == '__main__':
     send_queue = Queue()
     schedule_queue = Queue()  # 예약 메시지 큐
-    HOST = ''
+    HOST = '0.0.0.0'
     PORT = 9000
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_sock.bind((HOST, PORT))
