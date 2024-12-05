@@ -107,7 +107,7 @@ def handle_scheduled_messages(schedule_queue, send_queue, nicknames):
                     sender_nickname = nicknames.get(sender_conn, "Unknown")
                     send_queue.put(("SCHEDULED", sender_nickname, message))
                     schedule_queue.get()  # 작업 제거
-            time.sleep(10)  # 10초마다 예약 확인
+            time.sleep(3)  # 3초마다 예약 확인
         except Exception as e:
             log_message(f"Error in handle_scheduled_messages: {e}")
 

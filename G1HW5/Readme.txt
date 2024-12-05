@@ -4,7 +4,7 @@
 
 20203058 남태인 - 알고리즘 설계, 구현, 아이디어 제공 및 기능 구현
 
-20203072 안민호 – 알고리즘 설계, 구현, 아이디어 제공 및 기능 구현
+20203072 안민호 – 알고리즘 설계, 구현, 아이디어 제공 및 기능 구현, 발표, readme작성
 
 1. 프로그램 구성요소 : server.py, client.py
 
@@ -77,9 +77,9 @@
 ⑥ UPLOAD FILE을 클릭하여 server.py를 업로드한다.
 	server.py가 업로드된 디렉터리에서 python3 server.py로 server를 실행한다.
 
-⑦ 로컬에서 powershell 터미널 4개를 열어 python3 client.py로 client 4개를 실행한다. (vscode 터미널에서 실행해도 됨)
+⑦ 로컬에서 powershell 터미널 4개를 열어 python3 client.py로 client를 실행한다. (vscode 터미널에서 실행해도 됨)
 	
-⑧ server에 4개의 client가 모두 연결되면 프로그램이 실행된다.
+⑧ server에 client가 연결되면 프로그램이 실행된다.
 
 ☆주의할 점 : client의 host 값이 연결하려는 외부 IP값인지 확인
 		  (클라이언트 최대 10개까지 실행 가능)

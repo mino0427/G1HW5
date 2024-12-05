@@ -28,7 +28,8 @@ def receive_messages(client_sock, nickname):
 
 if __name__ == '__main__':
     client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    Host = '34.68.170.234'
+    # Host = '34.68.170.234'
+    Host = '127.0.0.1'
     Port = 9000
     client_sock.connect((Host, Port))
     print(f'Connecting to {Host} {Port}')
